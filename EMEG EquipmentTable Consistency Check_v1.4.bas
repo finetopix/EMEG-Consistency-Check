@@ -11,7 +11,9 @@ Sub Equipment_Table_Consistency_Check()
 '' then run the Macro
 ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+'v1.3 power comparison per port
 'v1.4 saveas file name added time stamp
+'v1.41 antenna id type check 2024.03.05
 Dim full_zip_filename As Variant
 Dim FileDialog As FileDialog
 Dim zip_filepath As Variant
@@ -245,7 +247,7 @@ Sub ImportCSVFilesAndComparison(stad_csv As String, equip_csv As String)
     Dim lookupRange As Range
     Dim position As Long
     Dim port_item As Variant
-    Dim currentDate As Date
+	Dim currentDate As Date
     Dim currentHour As Integer
     Dim currentMinute As Integer
     
@@ -403,6 +405,14 @@ Sub ImportCSVFilesAndComparison(stad_csv As String, equip_csv As String)
                 Exit For
             End If
         Next a
+		'change the cell format to text if it contains a number
+        '2024.03.05
+        If IsNumeric(ws1.Cells(i, 8)) Then
+            ws1.Cells(i, 8).NumberFormat = "@"
+            'convert the cell value to string
+            ws1.Cells(i, 8) = CStr(ws1.Cells(i, 8))
+        End If
+        '2024.03.05
         combined_value = ws1.Cells(i, 8) + "_" + carrier + "_" + band
        'Debug.Print combined_value
         ws1.Cells(i, 1) = combined_value
@@ -481,8 +491,8 @@ Sub ImportCSVFilesAndComparison(stad_csv As String, equip_csv As String)
             result = ws2.Cells(i, 12)
             result = RemoveZeroInPower(result)
             ws2.Cells(i, 12) = result
-            
-            If ws2.Cells(i, 18) <> ws2.Cells(i, 12) Then
+            'v1.3 power comparison per port
+            If Not port_power_match(ws2.Cells(i, 12), ws2.Cells(i, 18)) Then 'ws2.Cells(i, 18) <> ws2.Cells(i, 12) Then 'total power comparison
                 ws2.Cells(i, 18).Interior.Color = RGB(255, 255, 0)
                 ws2.Cells(i, 12).Interior.Color = RGB(255, 255, 0)
                 ws2.Cells(i, 18).Font.Color = RGB(255, 0, 0)
@@ -491,6 +501,7 @@ Sub ImportCSVFilesAndComparison(stad_csv As String, equip_csv As String)
                 'ws2.Cells(i, 10).Font.Color = RGB(255, 0, 0)
                 ws2.Cells(i, 1).Interior.Color = RGB(255, 255, 0)
             End If
+            
             result = ""
         End If
         
@@ -675,8 +686,7 @@ Sub ImportCSVFilesAndComparison(stad_csv As String, equip_csv As String)
     currentDate = Date
     currentHour = Hour(Now)
     currentMinute = Minute(Now)
-    
-    wb.SaveAs docPath + rfnsa_id + "_Comparison_PRD vs STAD_" + Format(currentDate, "YYYYMMDD") + Format(currentHour, "00") + Format(currentMinute, "00") + ".xlsx"
+	wb.SaveAs docPath + rfnsa_id + "_Comparison_PRD vs STAD_" + Format(currentDate, "YYYYMMDD") + Format(currentHour, "00") + Format(currentMinute, "00") + ".xlsx"
 End Sub
 
 Public Function dBmToWatts(dBm As Variant) As Double
@@ -775,4 +785,51 @@ Function FindSecondSlashPosition(inputString As String) As Long
     ' If the second slash is not found, return -1 or any other indicator of not found
     FindSecondSlashPosition = -1
 End Function
+Function port_power_match(prd_power As String, stad_power As String) As Boolean
+Dim port_item_prd As Variant
+Dim port_item_stad As Variant
+Dim ports_prd As Integer
+Dim ports_stad As Integer
+Dim power_gap As Double
 
+If InStr(prd_power, "+") Then
+    port_item_prd = Split(prd_power, "+")
+    ports_prd = UBound(port_item_prd)
+Else
+    ports_prd = 0
+End If
+
+If InStr(stad_power, "+") Then
+    port_item_stad = Split(stad_power, "+")
+    ports_stad = UBound(port_item_stad)
+Else
+    ports_stad = 0
+End If
+
+'if ports number not match, return false
+If ports_prd <> ports_stad Then
+    port_power_match = False
+    Exit Function
+End If
+
+If ports_stad = 0 Then
+    power_gap = Round(Abs(stad_power - prd_power), 2)
+    If power_gap >= 1 Then
+        port_power_match = False
+        Exit Function
+    End If
+    port_power_match = True
+    Exit Function
+End If
+        
+'if ports number matched, then start power comparison per port
+For i = 0 To ports_prd
+    power_gap = Round(Abs(port_item_stad(i) - port_item_prd(i)), 2)
+    'Debug.Print power_gap
+    If power_gap >= 1 Then
+        port_power_match = False
+        Exit Function
+    End If
+Next i
+port_power_match = True
+End Function
