@@ -111,6 +111,8 @@ Sub Replace_text(tableindex)
     Dim row As Integer
     Dim vendor As String
     Dim height As Double
+    Dim port_item As Variant
+    Dim result As String
     
     Set tbl = ActiveDocument.Tables(tableindex)
     For Each cell In tbl.range.Cells
@@ -181,19 +183,21 @@ Sub Replace_text(tableindex)
                 cell.range.Text = Replace(cell.range.Text, Chr(13), "")
             
             Case 11
-                If InStr(cell.range.Text, "+0") Then
-                    cell.range.Text = Replace(cell.range.Text, "+0", "")
-                End If
-                If InStr(cell.range.Text, "0+0+0+0+") Then
-                    cell.range.Text = Replace(cell.range.Text, "0+0+0+0+", "")
-                End If
-                
-                If InStr(cell.range.Text, "0+0+0+") Then
-                    cell.range.Text = Replace(cell.range.Text, "0+0+0+", "")
-                End If
-                
-                If InStr(cell.range.Text, "0+0+") Then
-                    cell.range.Text = Replace(cell.range.Text, "0+0+", "")
+                port_item = ""
+                result = ""
+                'if cell value with multiple ports,then divided by "+" to remove zeros, then merge again
+                If InStr(cell.Range.Text, "+") Then
+                    port_item = Split(Replace(cell.Range.Text, "", ""), "+")
+                    For Each Item In port_item
+                        If Item <> "0" Then
+                            'Debug.Print cell.Range.Text
+                            If result = "" Then
+                                result = Item 'first port power value assign to cell directly
+                            Else
+                                result = result + "+" + Item '2nd and after connected with "+"
+                            End If
+                        End If
+                    Next Item
                 End If
                 
                 'remove line breaks
